@@ -825,7 +825,7 @@ const COSMOS_CROPS = [
 export const LAYERS = [
   { name: "Fried shallots & cashews", band: 0.62, groups: [[[8, 9], 22, 0.17], [[18, 19, 20], 18, 0.14]], drift: "up" },
   { name: "Ghee, saffron & whole spices", band: 0.24, groups: [[[6, 7], 12, 0.1], [[11], 18, 0.17], [[10], 10, 0.15], [[12], 8, 0.13], [[13], 6, 0.19]], drift: "side" },
-  { name: "Kaima rice", band: -0.12, groups: [[[21, 22, 23], 18, 0.21], [[4, 5], 110, 0.06]], drift: "depth" },
+  { name: "Kaima rice", band: -0.12, groups: [[[4, 5], 150, 0.06], [[4, 5], 40, 0.08]], drift: "depth" },
   { name: "Beef, mutton & marinated chicken", band: -0.5, groups: [[[24], 3, 0.3], [[25], 3, 0.34], [[14, 15, 16, 17], 12, 0.28], [[0, 1], 4, 0.23]], drift: "settle" },
 ];
 const PIECES = LAYERS.flatMap((L, layer) =>
@@ -836,9 +836,15 @@ const PIECES = LAYERS.flatMap((L, layer) =>
 
 const POT_H = 2; // world units at z = 0, before responsive scaling
 const POT_BIG = 1.55; // the assembly handi fills the frame instead of floating in empty space
-const MOUTH = 0.15; // the open pot's mouth sits this far (in pot heights) above the photo's centre
-const MOUTH_RX = 0.29; // inner opening half-size, in pot heights
-const MOUTH_RY = 0.11;
+const MOUTH = 0.1425; // the rim of pot.jpg sits this far (in pot heights) above the photo's centre
+const MOUTH_RX = 0.31; // the rim's inner half-size, in pot heights
+const MOUTH_RY = 0.16;
+const DEEP = 0.17; // how far below the rim (in pot heights) the empty pot's floor surface sits
+// Height (pot heights below the rim) and radius scale of the biriyani surface at fill level 0–1. Must match FILL_FRAG.
+const surface = (level) => {
+  const lv = Math.min(level / 0.85, 1);
+  return [(1 - lv) * DEEP, lerp(0.8, 1, lv)];
+};
 const REVEAL = COSMOS + 1; // PLATES index of the banana-leaf reveal the handi glides into
 const REVEAL_POT_W = 0.265; // the handi's width in that photo, as a fraction of its width
 
@@ -891,6 +897,54 @@ function useCutout(src, mouth = [0.5, 0.64]) {
   return mat;
 }
 
+// A real biriyani surface (rice, chicken, fried onion, cashew, cropped from reveal.jpg) inside pot.jpg's mouth, on a
+// plane the same size as the pot photo. It rises from deep in the pot to the rim as the layers land, then mounds above
+// it, so the open handi reads densely packed instead of empty. Masala-red while only the meat is in.
+const FILL_FRAG = `
+uniform sampler2D uMap; uniform float uAlpha, uLevel, uMeat, uGlow, uTime; varying vec2 vUv;
+const vec2 C = vec2(0., .285); const vec2 R = vec2(.62, .32); // the rim's inner ellipse, pot-photo units (−1..1)
+float dome(vec2 q, float ry, float mound) { return length(vec2(q.x, q.y > 0. ? q.y * ry / (ry + mound) : q.y)); }
+void main() {
+  vec2 p = vUv * 2. - 1.;
+  float lv = clamp(uLevel / .85, 0., 1.);
+  vec2 sc = C - vec2(0., (1. - lv) * .34);
+  vec2 sr = R * mix(.8, 1., lv);
+  float mound = smoothstep(.85, 1., uLevel) * .22;
+  float d = dome((p - sc) / sr, sr.y, mound);
+  // Below the rim the front wall hides the surface: clip to the rim (which the mound may rise above).
+  float mask = (1. - smoothstep(.93, 1., d)) * (1. - smoothstep(.95, 1., dome((p - C) / R, R.y, mound)));
+  vec2 uv = vec2(.5 + (p.x - sc.x) / sr.x * .46, (p.y - sc.y + sr.y) / (2. * sr.y + mound) * .9 + .05);
+  // Grains settle and shift a touch while the steam works.
+  uv += vec2(sin(uTime * .7 + p.y * 9.), cos(uTime * .5 + p.x * 7.)) * .0015;
+  vec3 col = texture2D(uMap, uv).rgb;
+  col = mix(col, col * vec3(1.1, .55, .32), uMeat);
+  col *= mix(.45, 1., lv) * (.62 + .38 * (1. - pow(clamp(d, 0., 1.), 3.))); // deep = dark; rim shadow at the edge
+  col *= 1. + uGlow * (.25 + .05 * sin(uTime * 9.));
+  float a = mask * uAlpha * smoothstep(0., .06, uLevel);
+  if (a < .01) discard;
+  gl_FragColor = vec4(col, a);
+  #include <colorspace_fragment>
+}`;
+function useFill() {
+  const tex = useMemo(() => {
+    const t = new THREE.TextureLoader().load("/plates/handi-fill.jpg");
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uMap: { value: tex }, uAlpha: { value: 0 }, uLevel: { value: 0 }, uMeat: { value: 0 }, uGlow: { value: 0 }, uTime: { value: 0 } },
+        vertexShader: CUT_VERT,
+        fragmentShader: FILL_FRAG,
+        transparent: true,
+      }),
+    [tex]
+  );
+  useEffect(() => () => [tex, mat].forEach((x) => x.dispose()), [tex, mat]);
+  return mat;
+}
+
 function Cosmos({ low }) {
   const sprites = useSprites();
   const group = useRef();
@@ -899,6 +953,7 @@ function Cosmos({ low }) {
   const atlas = useAtlas(COSMOS_CROPS);
   const potMat = useCutout("/plates/pot.jpg");
   const sealedMat = useCutout("/plates/pot-sealed.jpg", [0.5, 0.72]);
+  const fillMat = useFill();
   const itemMat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -959,7 +1014,12 @@ function Cosmos({ low }) {
     sealedMat.uniforms.uAlpha.value = on * seal;
     potMat.uniforms.uGlow.value = filled * 0.9;
     sealedMat.uniforms.uGlow.value = 0.5 + reveal * 0.6;
-    potMat.uniforms.uTime.value = sealedMat.uniforms.uTime.value = time;
+    potMat.uniforms.uTime.value = sealedMat.uniforms.uTime.value = fillMat.uniforms.uTime.value = time;
+    // The biriyani rises in the handi layer by layer, then brims over the rim.
+    fillMat.uniforms.uAlpha.value = potMat.uniforms.uAlpha.value;
+    fillMat.uniforms.uLevel.value = filled;
+    fillMat.uniforms.uMeat.value = 1 - span(p, PH.snap(2));
+    fillMat.uniforms.uGlow.value = filled * 0.6;
 
     // The mouth of the open handi (world units), and how full it is.
     const mx = pots.current.position.x;
@@ -999,18 +1059,25 @@ function Cosmos({ low }) {
       // Snap: a short pull back, then an accelerating rush into the handi's mouth (the "magnetic" feel).
       const c = smoothstep01((p - PH.snap(it.layer)[0] - r5 * 0.02) / (PH.snap(it.layer)[1] - PH.snap(it.layer)[0]));
       const m = c * c * (2.6 * c - 1.6);
-      const ra = Math.sqrt(r0) * 0.85;
-      const tx = mx + Math.cos(r1 * 6.283) * rx * ra;
-      const ty = my + Math.sin(r1 * 6.283) * ry * ra + (3 - it.layer) * 0.02 * potScale;
+      // Each layer lands on the surface it creates (meat deep in the pot, garnish heaped above the rim).
+      const [deep, rs] = surface((4 - it.layer) / 4);
+      const ra = Math.sqrt(r0) * 0.92 * rs;
+      const ang = r1 * 6.283;
+      const mound = it.layer === 0 ? 0.11 * (1 - ra * ra) * POT_H * potScale * Math.max(0, Math.sin(ang)) + 0.05 * potScale : 0;
+      const tx = mx + Math.cos(ang) * rx * ra;
+      // Never below the front lip: the copper wall hides anything lower.
+      const ty = Math.max(my - deep * POT_H * potScale + Math.sin(ang) * ry * ra, my - ry * 0.7) + mound;
       const tz = 0.06 + (3 - it.layer) * 0.02 + r2 * 0.01;
+      // Buried under the next layer up (a few chicken pieces still show through, like a real opened pot).
+      const bury = it.layer > 0 ? span(p, PH.snap(it.layer - 1)) * (it.layer === 3 && r6 > 0.7 ? 0.3 : it.layer === 1 ? 0.5 : 0.9) : 0;
       x = lerp(x, tx, m);
       y = lerp(y, ty, m);
       z = lerp(z, tz, Math.max(0, m));
       buf.pos.set([x, y, z], i * 3);
-      buf.size[i] = it.size * sizeK * lerp(0.8, 1, e) * lerp(1, 0.6, Math.max(0, m));
+      buf.size[i] = it.size * sizeK * lerp(0.8, 1, e) * lerp(1, 0.78, Math.max(0, m));
       buf.angle[i] = r5 * 6.28 + (1 - e) * (r3 - 0.5) * 5 + time * (r0 - 0.5) * 0.3 * (1 - c);
       // The nearest pieces thin out a little so the handi still reads through the field; gone before the lid appears.
-      buf.alpha[i] = on * smoothstep01((e - 0.02) / 0.1) * (z > 1.3 && m < 0.5 ? 0.8 : 1) * (1 - span(p, [0.655, 0.672]));
+      buf.alpha[i] = on * smoothstep01((e - 0.02) / 0.1) * (z > 1.3 && m < 0.5 ? 0.8 : 1) * (1 - bury) * (1 - span(p, [0.655, 0.672]));
     });
     const at = points.current.geometry.attributes;
     for (const key of ["position", "aSize", "aAlpha", "aAngle"]) at[key].needsUpdate = true;
@@ -1026,6 +1093,9 @@ function Cosmos({ low }) {
     <group ref={group} visible={false}>
       <group ref={pots}>
         <mesh material={potMat} renderOrder={1}>
+          <planeGeometry args={[POT_H, POT_H]} />
+        </mesh>
+        <mesh material={fillMat} renderOrder={1} position-z={0.005}>
           <planeGeometry args={[POT_H, POT_H]} />
         </mesh>
         <mesh material={sealedMat} renderOrder={1} position-z={0.01}>
@@ -1069,7 +1139,7 @@ function updateOrbitDust(b, dt, t) {
 
 // Rings, inside out: [radius (pot heights), angular speed, tilt, [cells, count, size]…]
 const RINGS = [
-  [0.62, 1.15, 0.3, [[[4, 5], 26, 0.07], [[21, 22, 23], 8, 0.2], [[6, 7], 8, 0.1]]], // rice, ghee
+  [0.62, 1.15, 0.3, [[[4, 5], 44, 0.07], [[6, 7], 8, 0.1]]], // rice grains, ghee
   [0.95, -0.8, 0.26, [[[10], 8, 0.15], [[11], 9, 0.18], [[12], 6, 0.13], [[13], 5, 0.19]]], // whole spices, saffron
   [1.3, 0.55, 0.22, [[[14, 15, 16, 17], 8, 0.26], [[0, 1, 2, 3], 6, 0.24], [[8, 9], 8, 0.2], [[18, 19, 20], 7, 0.15]]], // meat, onion, cashew
 ];
@@ -1098,6 +1168,7 @@ function Climax({ low }) {
   const atlas = useAtlas(COSMOS_CROPS);
   const potMat = useCutout("/plates/pot.jpg");
   const plateMat = useCutout("/plates/plated.jpg", [0.5, 0.45]);
+  const fillMat = useFill();
   const itemMat = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -1147,7 +1218,10 @@ function Climax({ low }) {
     pot.current.scale.setScalar(fit * lerp(0.8, 1, potIn) * (1 + glow * 0.04) * (1 - plateIn * 0.25));
     potMat.uniforms.uAlpha.value = on * potIn * (1 - plateIn);
     potMat.uniforms.uGlow.value = glow * 1.4;
-    potMat.uniforms.uTime.value = plateMat.uniforms.uTime.value = time;
+    potMat.uniforms.uTime.value = plateMat.uniforms.uTime.value = fillMat.uniforms.uTime.value = time;
+    fillMat.uniforms.uAlpha.value = potMat.uniforms.uAlpha.value;
+    fillMat.uniforms.uLevel.value = spiral;
+    fillMat.uniforms.uGlow.value = glow;
     // The plate rises out of the steam where the pot stood.
     plate.current.position.y = lerp(-0.6, 0, plateIn) * fit;
     plate.current.scale.setScalar(fit * lerp(0.7, 1.15, plateIn));
@@ -1193,6 +1267,9 @@ function Climax({ low }) {
     <group ref={group} visible={false}>
       <mesh ref={pot} material={potMat} renderOrder={1}>
         <planeGeometry args={[POT_H, POT_H]} />
+        <mesh material={fillMat} renderOrder={1} position-z={0.005}>
+          <planeGeometry args={[POT_H, POT_H]} />
+        </mesh>
       </mesh>
       {/* Saffron-amber bloom welling out of the mouth as the rings pour in. */}
       <mesh ref={bloom} renderOrder={1} position-z={-0.05}>
