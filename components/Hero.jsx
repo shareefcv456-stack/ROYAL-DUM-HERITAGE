@@ -55,7 +55,7 @@ export default function Hero() {
 
         {/* The dish: rotates in when picked, on a copper-rimmed plate with a glow in the dish's own accent. */}
         <div className="relative md:col-start-2 md:row-span-3 md:row-start-1">
-          <div className="relative mx-auto aspect-square w-full max-w-[min(84vw,560px)]">
+          <div data-speed="0.8" className="relative mx-auto aspect-square w-full max-w-[min(84vw,560px)]">
             <div className="absolute inset-[8%] rounded-full opacity-50 blur-3xl transition-colors duration-700" style={{ backgroundColor: d.accent }} />
             <div className="absolute inset-[4%] rounded-full shadow-[0_40px_80px_-24px_rgba(0,0,0,0.7)] ring-[10px] ring-copper/85" />
             {DISHES.map((x) => (

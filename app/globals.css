@@ -48,6 +48,19 @@ body {
     radial-gradient(120% 80% at 80% 0%, rgb(255 255 255 / 0.05), transparent 60%);
 }
 
+/* The same veins on any background colour (the Flavour Wheel sets its own). */
+.veins { background-image: repeating-linear-gradient(104deg, rgb(255 255 255 / 0.03) 0 1px, transparent 1px 26px); }
+
+/* Sharp editorial cut-in: each line rises out of its own mask; the rest follows a beat later. */
+@keyframes cut { from { transform: translateY(105%); } }
+.cut-in h2 > span > * { animation: cut 0.75s cubic-bezier(.2, .8, .2, 1) both; }
+.cut-in h2 > span:nth-child(2) > * { animation-delay: 0.08s; }
+.cut-in > :not(h2) { animation: settle 0.6s 0.18s cubic-bezier(.2, .8, .2, 1) both; }
+
+/* Magnetic cards: they lean toward the cursor (--mx/--my set from pointer position) and lift on hover or focus. */
+.magnetic { transform: translate3d(var(--mx, 0px), calc(var(--my, 0px) + var(--lift, 0px)), 0); transition: transform 0.4s cubic-bezier(.2, .8, .2, 1), box-shadow 0.3s; }
+.magnetic:hover, .magnetic:focus-within { --lift: -5px; box-shadow: 0 26px 44px -26px rgb(28 24 20 / 0.4); }
+
 /* Kerala woodwork: a thin carved lattice band in aged copper, used sparingly as a divider. */
 .trim {
   height: 10px;
@@ -68,6 +81,25 @@ body {
 /* Spices drifting at the outer edges of the hero, each at its own pace. */
 @keyframes drift { 50% { transform: translate3d(0, -14px, 0) rotate(var(--spin, 8deg)); } }
 .drift { animation: drift var(--dur, 9s) ease-in-out infinite; }
+
+/* Ticker bands: one copy of the line slides out as its twin slides in. Compositor-only. */
+@keyframes marquee { to { transform: translate3d(-50%, 0, 0); } }
+.marquee { animation: marquee 32s linear infinite; }
+.marquee-rev { animation-direction: reverse; }
+@media (prefers-reduced-motion: reduce) { .marquee { animation: none; } }
+
+/* Biriyani O'Clock: the clock shakes in short bursts while waves pulse beside it; faster when clicked. */
+.alarm-body, .alarm-waves { transform-box: view-box; transform-origin: 200px 250px; }
+@keyframes alarm-shake {
+  0%, 18%, 100% { transform: rotate(0); }
+  2%, 6%, 10%, 14% { transform: rotate(-4deg); }
+  4%, 8%, 12%, 16% { transform: rotate(4deg); }
+}
+@keyframes alarm-waves { 0%, 22%, 100% { opacity: 0; transform: scale(0.92); } 5%, 16% { opacity: 0.85; transform: scale(1.04); } }
+.alarm-body.alarm-idle { animation: alarm-shake 3.4s ease-in-out infinite; }
+.alarm-waves.alarm-idle { animation: alarm-waves 3.4s ease-out infinite; }
+.alarm-body.alarm-ring { animation: alarm-shake 0.8s ease-in-out 2; }
+.alarm-waves.alarm-ring { animation: alarm-waves 0.8s ease-out 2; }
 
 /* Cart button: a short pop on every add. */
 @keyframes pop { 40% { transform: scale(1.25); } }

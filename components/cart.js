@@ -8,33 +8,35 @@ import { story } from "./state.js";
 // "demo" notice while this is true. Replace the items with the real menu, then set SAMPLE to false.
 export const SAMPLE = true;
 
+// title/theme/floats are presentation only (the Flavour Wheel): display name, background and highlight colours,
+// and the floating ingredient sprites (public/plates/float/ or /spice/, art-src/float-sprites.py).
 export const DISHES = [
   {
-    id: "chicken", accent: "#d39a32", name: "Chicken", full: "Chicken Dum Biriyani", price: 349,
+    id: "chicken", title: "Authentic Chicken", theme: { bg: "#3a2611", hi: "#efb04a" }, floats: ["chicken-1", "chicken-2", "cashew", "cardamom"], accent: "#d39a32", name: "Chicken", full: "Chicken Dum Biriyani", price: 349,
     note: "Bone-in chicken in a yoghurt, green chilli and ginger masala, layered under Kaima rice.",
     layers: ["Chicken, masala", "Kaima rice, ghee & saffron", "Cardamom, clove, cinnamon, star anise", "Fried shallots, cashews, raisins"],
     heat: 2, serves: "Serves 1–2", weight: "650 g", meat: "Marinated chicken", available: true,
   },
   {
-    id: "mutton", accent: "#a0603e", name: "Mutton", full: "Mutton Dum Biriyani", price: 449,
+    id: "mutton", title: "Rich Mutton", theme: { bg: "#311619", hi: "#e39a74" }, floats: ["mutton-2", "mutton-1", "mutton-3", "cinnamon"], accent: "#a0603e", name: "Mutton", full: "Mutton Dum Biriyani", price: 449,
     note: "Bone-in mutton in a peppery masala, slow-cooked under the rice.",
     layers: ["Bone-in mutton, pepper masala", "Kaima rice, ghee & saffron", "Cinnamon, clove, black cardamom", "Fried shallots, mint, cashews"],
     heat: 3, serves: "Serves 1–2", weight: "650 g", meat: "Bone-in mutton", available: true,
   },
   {
-    id: "beef", accent: "#9a4433", name: "Beef", full: "Beef Dum Biriyani", price: 399,
+    id: "beef", title: "Malabar Beef", theme: { bg: "#2b1410", hi: "#ea7a55" }, floats: ["beef-2", "beef-1", "beef-3", "clove"], accent: "#9a4433", name: "Beef", full: "Beef Dum Biriyani", price: 399,
     note: "Beef braised with green chilli, ginger and curry leaf.",
     layers: ["Beef, green chilli & ginger masala", "Kaima rice, ghee", "Fennel, clove, cardamom, curry leaf", "Fried shallots, green chilli"],
     heat: 3, serves: "Serves 1–2", weight: "650 g", meat: "Beef", available: true,
   },
   {
-    id: "fish", accent: "#c8662f", name: "Fish", full: "Fish (Neymeen) Dum Biriyani", price: 529,
+    id: "fish", title: "Spiced Fish", theme: { bg: "#0f2b2a", hi: "#f2914f" }, floats: ["fish-1", "fish-2", "onion", "star-anise"], accent: "#c8662f", name: "Fish", full: "Fish (Neymeen) Dum Biriyani", price: 529,
     note: "Seer fish in red chilli and kokum, pan-seared, then laid on the rice.",
     layers: ["Seer fish, red chilli & kokum", "Kaima rice, ghee & saffron", "Fennel, pepper, curry leaf", "Fried shallots, lime"],
     heat: 3, serves: "Serves 1–2", weight: "600 g", meat: "Seer fish", available: true,
   },
   {
-    id: "prawn", accent: "#d07a52", name: "Prawn", full: "Prawn (Chemmeen) Dum Biriyani", price: 499,
+    id: "prawn", title: "Prawn (Chemmeen)", theme: { bg: "#2e1714", hi: "#ff9470" }, floats: ["prawn-1", "prawn-2", "onion", "saffron"], accent: "#d07a52", name: "Prawn", full: "Prawn (Chemmeen) Dum Biriyani", price: 499,
     note: "Prawns in coconut, curry leaf and black pepper.",
     layers: ["Prawns, coconut & pepper masala", "Kaima rice, ghee & saffron", "Curry leaf, clove, cardamom", "Fried shallots, coconut slivers"],
     heat: 2, serves: "Serves 1–2", weight: "600 g", meat: "Tiger prawns", available: true,
@@ -59,6 +61,9 @@ export const HOURS = ""; // e.g. "Daily, 12 pm – 10 pm"
 // Delivery areas as 6-digit PIN codes. Empty → any valid PIN is accepted and the area is confirmed with the order.
 export const DELIVERY_PINS = [];
 export const DELIVERY_FEE = null; // a number in rupees, or null → "confirmed with your order"
+// Current offers, exactly as the business words them (e.g. "Family combo: 2 biriyanis + raita, ₹…"). Shown in the
+// ticker only when set; never make one up.
+export const OFFERS = [];
 
 // Delivery-area check for a PIN code: "bad" (not a PIN), "out" (outside the listed areas), or "ok".
 export const pinStatus = (pin) => (!/^\d{6}$/.test(String(pin || "").trim()) ? "bad" : DELIVERY_PINS.length && !DELIVERY_PINS.includes(String(pin).trim()) ? "out" : "ok");

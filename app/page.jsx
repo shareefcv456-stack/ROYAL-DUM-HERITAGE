@@ -1,11 +1,14 @@
 import Hero from "@/components/Hero";
 import Story from "@/components/Story";
 import Shop, { BottomBar, Cart, CartButton } from "@/components/Shop";
-import { Craft, Delivery, Faq, Footer } from "@/components/Info";
+import { Craft, Delivery, Faq, Footer, Ticker } from "@/components/Info";
+import Flavours from "@/components/Flavours";
+import Clock from "@/components/Clock";
 
 const NAV = [
   ["#menu", "Menu"],
   ["#story", "The Dum"],
+  ["#flavours", "Flavours"],
   ["#craft", "Craft"],
   ["#delivery", "Delivery"],
   ["#faq", "FAQ"],
@@ -41,11 +44,15 @@ export default function Home() {
 
       <main>
         <Hero />
+        <Ticker />
         <Story />
+        <Ticker tone="light" reverse />
+        <Flavours />
         <Shop />
         <Craft />
         <Delivery />
         <Faq />
+        <Clock />
       </main>
       <Footer />
       <BottomBar />

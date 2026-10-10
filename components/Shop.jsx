@@ -50,6 +50,16 @@ export function DemoNotice({ className = "" }) {
   );
 }
 
+// Magnetic cards: lean a few pixels toward a mouse cursor (not touch, not reduced motion); CSS does the easing.
+const magnet = (e) => {
+  if (e.pointerType !== "mouse" || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width - 0.5) * 12}px`);
+  el.style.setProperty("--my", `${((e.clientY - r.top) / r.height - 0.5) * 12}px`);
+};
+const unmagnet = (e) => ["--mx", "--my"].forEach((k) => e.currentTarget.style.removeProperty(k));
+
 // Add, with immediate feedback: the button becomes a quantity stepper and "Added" flashes beside it.
 function AddControl({ x, qty }) {
   const [flash, setFlash] = useState(0);
@@ -97,7 +107,9 @@ export default function Shop() {
           {DISHES.map((x) => (
             <li key={x.id} className="lift">
               <article
-                className={`flex h-full flex-col overflow-hidden rounded-2xl bg-white/70 ring-1 transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_40px_-24px_rgba(28,24,20,0.35)] focus-within:-translate-y-1 focus-within:shadow-[0_24px_40px_-24px_rgba(28,24,20,0.35)] ${x.id === flavor ? "ring-copper/60" : "ring-ink/10"}`}
+                onPointerMove={magnet}
+                onPointerLeave={unmagnet}
+                className={`magnetic flex h-full flex-col overflow-hidden rounded-2xl bg-white/70 ring-1 ${x.id === flavor ? "ring-copper/60" : "ring-ink/10"}`}
               >
                 <button onClick={() => setFlavor(x.id)} className="block overflow-hidden" aria-label={`Show ${x.full} in the hero`} tabIndex={-1}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,7 +147,7 @@ export default function Shop() {
         </div>
         <ul className="mt-6 grid gap-4 sm:grid-cols-3">
           {ADDONS.map((x) => (
-            <li key={x.id} className="lift flex flex-col justify-between gap-4 rounded-2xl bg-white/70 p-5 ring-1 ring-ink/10 transition hover:-translate-y-0.5 focus-within:-translate-y-0.5">
+            <li key={x.id} onPointerMove={magnet} onPointerLeave={unmagnet} className="lift magnetic flex flex-col justify-between gap-4 rounded-2xl bg-white/70 p-5 ring-1 ring-ink/10">
               <div>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="font-serif text-2xl">{x.full}</span>

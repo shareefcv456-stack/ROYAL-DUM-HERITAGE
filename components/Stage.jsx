@@ -3,7 +3,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { PLATES, burst, plateSrc, shot } from "./plates";
+import { COSMOS, PLATES, burst, plateSrc, shot } from "./plates";
 import { story } from "./state";
 
 const { damp, lerp, clamp } = THREE.MathUtils;
@@ -831,6 +831,418 @@ function Spices({ count }) {
   );
 }
 
+/* ======================= the Culinary Taskflow (Assembly) ======================= */
+// The burger-reel, scrubbed by scroll: a big copper handi centre stage, then every ingredient erupts in from the left
+// and right margins and fills the whole frame in four deep layers (near pieces drift outward, far ones inward as you
+// scroll), then the layers pack into the handi bottom first, the dough seal goes on, thick steam rises, and the handi
+// glides into place in the banana-leaf reveal. Every piece is a photographic cut-out; layers stay visible in the mouth.
+
+const ING = "/plates/ingredients.jpg";
+const CHK = "/plates/chicken.jpg";
+const MEAT = "/plates/meat-cuts.jpg"; // keyed from meats.jpg
+const SEA = "/plates/seafood.jpg";
+const COSMOS_CROPS = [
+  [ING, 120, 80, 190], [ING, 438, 78, 190], [ING, 750, 78, 190], [ING, 1065, 78, 190], // 0–3 marinated meat
+  [ING, 105, 335, 100], [ING, 715, 335, 100], // 4–5 Kaima rice grains
+  [ING, 103, 538, 110], [ING, 255, 538, 110], // 6–7 ghee
+  [ING, 718, 508, 170], [ING, 1113, 508, 170], // 8–9 fried onion
+  [SPICE_SHEET, 130, 48, 140], [SPICE_SHEET, 927, 455, 140], [SPICE_SHEET, 1136, 118, 120], [SPICE_SHEET, 125, 315, 200], // 10 cardamom, 11 saffron, 12 clove, 13 star anise
+  [CHK, 90, 55, 210], [CHK, 420, 55, 210], [CHK, 753, 55, 210], [CHK, 1075, 55, 210], // 14–17 marinated chicken
+  [CHK, 112, 315, 140], [CHK, 367, 315, 140], [CHK, 620, 315, 140], // 18–20 cashews
+  [CHK, 88, 500, 210], [CHK, 422, 500, 210], [CHK, 753, 500, 210], // 21–23 saffron rice
+  [MEAT, 0, 0, 400], [MEAT, 400, 0, 400], // 24 mutton, 25 beef rib
+  [SEA, 15, 40, 360], [SEA, 343, 40, 360], [SEA, 670, 40, 360], [SEA, 998, 40, 360], // 26–29 seer fish steaks
+  [SEA, 45, 430, 300], [SEA, 373, 430, 300], [SEA, 705, 430, 300], [SEA, 1032, 430, 300], // 30–33 tiger prawns
+];
+
+// The burger-reel breakdown, top layer first. Each layer: its groups of [cells, count, size], the height of its band
+// in the exploded view (fraction of the half-screen, + is up), and how it moves while exploded.
+export const LAYERS = [
+  { name: "Fried shallots & cashews", band: 0.62, groups: [[[8, 9], 22, 0.17], [[18, 19, 20], 18, 0.14]], drift: "up" },
+  { name: "Ghee, saffron & whole spices", band: 0.24, groups: [[[6, 7], 12, 0.1], [[11], 18, 0.17], [[10], 10, 0.15], [[12], 8, 0.13], [[13], 6, 0.19]], drift: "side" },
+  { name: "Kaima rice", band: -0.12, groups: [[[4, 5], 150, 0.06], [[4, 5], 40, 0.08]], drift: "depth" },
+  { name: "The meat", band: -0.5, groups: [[[14, 15, 16, 17], 22, 0.28]], drift: "settle" }, // cells follow the flavour (MEAT_CELLS)
+];
+// The base layer's cut-outs for each flavour (cart.js); swapped live when the flavour changes.
+const MEAT_CELLS = {
+  chicken: [14, 15, 16, 17],
+  mutton: [24, 0, 24, 1, 24, 2],
+  beef: [25, 2, 25, 3, 25, 0],
+  fish: [26, 27, 28, 29],
+  prawn: [30, 31, 32, 33],
+};
+const PIECES = LAYERS.flatMap((L, layer) =>
+  L.groups.flatMap(([cells, n, size]) =>
+    Array.from({ length: n }, (_, k) => ({ cell: cells[k % cells.length], size, layer, k, n, r: Array.from({ length: 7 }, Math.random) }))
+  )
+);
+
+const POT_H = 2; // world units at z = 0, before responsive scaling
+const POT_BIG = 1.55; // the assembly handi fills the frame instead of floating in empty space
+const MOUTH = 0.1425; // the rim of pot.jpg sits this far (in pot heights) above the photo's centre
+const MOUTH_RX = 0.31; // the rim's inner half-size, in pot heights
+const MOUTH_RY = 0.16;
+const DEEP = 0.17; // how far below the rim (in pot heights) the empty pot's floor surface sits
+// Height (pot heights below the rim) and radius scale of the biriyani surface at fill level 0–1. Must match FILL_FRAG.
+const surface = (level) => {
+  const lv = Math.min(level / 0.85, 1);
+  return [(1 - lv) * DEEP, lerp(0.8, 1, lv)];
+};
+const REVEAL = COSMOS + 1; // PLATES index of the banana-leaf reveal the handi glides into
+const REVEAL_POT_W = 0.265; // the handi's width in that photo, as a fraction of its width
+
+// Timeline within the section (p = 0–1), all inside the pinned part (the first ~76% of its scroll).
+export const PH = {
+  pot: [0, 0.08], // the empty copper handi rises centre stage
+  explode: [0.04, 0.28], // the four layers erupt in from the left and right margins
+  labels: [0.2, 0.44], // exploded view held, layers named
+  snap: (L) => [0.42 + (3 - L) * 0.045, 0.42 + (3 - L) * 0.045 + 0.1], // bottom layer first, each spirals into the handi
+  seal: [0.665, 0.7], // dough seal and lid (after the last layer has landed)
+  reveal: [0.69, 0.78], // steam builds; the sealed handi glides to its place in the reveal shot
+};
+const span = (p, [a, b]) => smoothstep01((p - a) / (b - a));
+const TAU = Math.PI * 2;
+const VORTEX_TILT = 0.38; // the packing vortex's height relative to its width, like the rim seen from the front
+
+const CUT_FRAG = `
+uniform sampler2D uMap; uniform float uAlpha, uGlow, uTime; uniform vec2 uMouth; varying vec2 vUv;
+void main() {
+  vec3 col = texture2D(uMap, vUv).rgb;
+  float key = smoothstep(.025, .07, max(col.r, max(col.g, col.b))) * (1. - smoothstep(.43, .5, length(vUv - .5)));
+  float a = key * uAlpha;
+  if (a < .02) discard;
+  // Warms from the mouth outward as layers land, flickering like it sits over embers.
+  float mouth = exp(-pow(length((vUv - uMouth) * vec2(1., 2.4)) * 3., 2.));
+  col *= 1. + uGlow * (.3 + mouth * 1.3) * (.9 + .1 * sin(uTime * 9.));
+  col += vec3(1., .55, .2) * uGlow * mouth * .3;
+  gl_FragColor = vec4(col, a);
+  #include <colorspace_fragment>
+}`;
+const CUT_VERT = `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+
+// A photographic cut-out on a plane, keyed off its black studio background.
+function useCutout(src, mouth = [0.5, 0.64]) {
+  const tex = useMemo(() => {
+    const t = new THREE.TextureLoader().load(src);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [src]);
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uMap: { value: tex }, uAlpha: { value: 0 }, uGlow: { value: 0 }, uTime: { value: 0 }, uMouth: { value: new THREE.Vector2(...mouth) } },
+        vertexShader: CUT_VERT,
+        fragmentShader: CUT_FRAG,
+        transparent: true,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tex]
+  );
+  useEffect(() => () => [tex, mat].forEach((x) => x.dispose()), [tex, mat]);
+  return mat;
+}
+
+// A real biriyani surface (rice, chicken, fried onion, cashew, cropped from reveal.jpg) inside pot.jpg's mouth, on a
+// plane the same size as the pot photo. It rises from deep in the pot to the rim as the layers land, then mounds above
+// it, so the open handi reads densely packed instead of empty. Masala-red while only the meat is in.
+const FILL_FRAG = `
+uniform sampler2D uMap; uniform float uAlpha, uLevel, uMeat, uGlow, uTime; varying vec2 vUv;
+const vec2 C = vec2(0., .285); const vec2 R = vec2(.62, .32); // the rim's inner ellipse, pot-photo units (−1..1)
+float dome(vec2 q, float ry, float mound) { return length(vec2(q.x, q.y > 0. ? q.y * ry / (ry + mound) : q.y)); }
+void main() {
+  vec2 p = vUv * 2. - 1.;
+  float lv = clamp(uLevel / .85, 0., 1.);
+  vec2 sc = C - vec2(0., (1. - lv) * .34);
+  vec2 sr = R * mix(.8, 1., lv);
+  float mound = smoothstep(.85, 1., uLevel) * .22;
+  float d = dome((p - sc) / sr, sr.y, mound);
+  // Below the rim the front wall hides the surface: clip to the rim (which the mound may rise above).
+  float mask = (1. - smoothstep(.93, 1., d)) * (1. - smoothstep(.95, 1., dome((p - C) / R, R.y, mound)));
+  vec2 uv = vec2(.5 + (p.x - sc.x) / sr.x * .46, (p.y - sc.y + sr.y) / (2. * sr.y + mound) * .9 + .05);
+  // Grains settle and shift a touch while the steam works.
+  uv += vec2(sin(uTime * .7 + p.y * 9.), cos(uTime * .5 + p.x * 7.)) * .0015;
+  vec3 col = texture2D(uMap, uv).rgb;
+  col = mix(col, col * vec3(1.1, .55, .32), uMeat);
+  col *= mix(.45, 1., lv) * (.62 + .38 * (1. - pow(clamp(d, 0., 1.), 3.))); // deep = dark; rim shadow at the edge
+  col *= 1. + uGlow * (.25 + .05 * sin(uTime * 9.));
+  float a = mask * uAlpha * smoothstep(0., .06, uLevel);
+  if (a < .01) discard;
+  gl_FragColor = vec4(col, a);
+  #include <colorspace_fragment>
+}`;
+// The selected flavour's version of a photo (handi-fill-fish.jpg …; chicken is the original), loaded the first time
+// that flavour is picked and kept: a handful of small textures at most.
+const flavorTex = new Map();
+function texFor(base, flavor) {
+  const src = flavor === "chicken" ? `/plates/${base}.jpg` : `/plates/${base}-${flavor}.jpg`;
+  let t = flavorTex.get(src);
+  if (!t) {
+    t = new THREE.TextureLoader().load(src);
+    t.colorSpace = THREE.SRGBColorSpace;
+    flavorTex.set(src, t);
+  }
+  return t;
+}
+
+function useFill() {
+  const tex = useMemo(() => {
+    const t = new THREE.TextureLoader().load("/plates/handi-fill.jpg");
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uMap: { value: tex }, uAlpha: { value: 0 }, uLevel: { value: 0 }, uMeat: { value: 0 }, uGlow: { value: 0 }, uTime: { value: 0 } },
+        vertexShader: CUT_VERT,
+        fragmentShader: FILL_FRAG,
+        transparent: true,
+      }),
+    [tex]
+  );
+  useEffect(() => () => [tex, mat].forEach((x) => x.dispose()), [tex, mat]);
+  return mat;
+}
+
+function Cosmos({ low }) {
+  const sprites = useSprites();
+  const group = useRef();
+  const pots = useRef();
+  const points = useRef();
+  const atlas = useAtlas(COSMOS_CROPS);
+  const potMat = useCutout("/plates/pot.jpg");
+  const sealedMat = useCutout("/plates/pot-sealed.jpg", [0.5, 0.72]);
+  const fillMat = useFill();
+  const meatOf = useRef(null);
+  const swap = useRef({ to: null, at: 0 });
+  const itemMat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        uniforms: { uMap: { value: atlas }, uScale: { value: 1 }, uCells: { value: COSMOS_CROPS.length } },
+        vertexShader: S_VERT,
+        fragmentShader: S_FRAG,
+        transparent: true,
+        depthWrite: false,
+        depthTest: true, // pieces sliding in behind the handi stay hidden behind it
+      }),
+    [atlas]
+  );
+  useEffect(() => () => itemMat.dispose(), [itemMat]);
+
+  const n = PIECES.length;
+  const buf = useMemo(
+    () => ({
+      pos: new Float32Array(n * 3),
+      size: new Float32Array(n),
+      alpha: new Float32Array(n),
+      angle: new Float32Array(n),
+      cell: Float32Array.from(PIECES, (it) => it.cell),
+    }),
+    [n]
+  );
+
+  useFrame((state) => {
+    const t = live.t;
+    // On screen from the end of the dum shot until the cut to the reveal.
+    const on = smoothstep01((t - COSMOS + 0.22) / 0.2) * (1 - smoothstep01((t - COSMOS - 0.84) / 0.12));
+    group.current.visible = on > 0.001;
+    live.cosmos = on;
+    if (!group.current.visible) return;
+
+    const time = state.clock.elapsedTime;
+    // The selected biriyani: its meat erupts and packs in, and its own surface fills the handi.
+    const apply = (f) => {
+      meatOf.current = f;
+      const cells = MEAT_CELLS[f] || MEAT_CELLS.chicken;
+      PIECES.forEach((it, i) => it.layer === 3 && (buf.cell[i] = cells[it.k % cells.length]));
+      points.current.geometry.attributes.aCell.needsUpdate = true;
+      fillMat.uniforms.uMap.value = texFor("handi-fill", f);
+    };
+    // A flavour change dissolves rather than pops: the meat and the handi's surface fade out, swap, and fade back in.
+    const sw = swap.current;
+    if (meatOf.current === null) apply(story.flavor);
+    else if (story.flavor !== (sw.to ?? meatOf.current)) Object.assign(sw, { to: story.flavor, at: time });
+    let fade = 1;
+    if (sw.to) {
+      const k = (time - sw.at) / 0.22;
+      if (k >= 1 && meatOf.current !== sw.to) apply(sw.to);
+      fade = k < 1 ? 1 - smoothstep01(k) : smoothstep01(k - 1);
+      if (k >= 2) sw.to = null;
+    }
+
+    const p = clamp(t - COSMOS, 0, 1);
+    const aspect = state.size.width / state.size.height;
+    // Responsive scale: the handi keeps a readable size on phones; flights use the full viewport.
+    const scale = clamp(view.hw / 2.6, 0.62, 1);
+    const potIn = span(p, PH.pot);
+    const seal = span(p, PH.seal);
+    const reveal = span(p, PH.reveal);
+    const explode = span(p, PH.explode);
+    const filled = PIECES.reduce((a, it) => a + span(p, PH.snap(it.layer)), 0) / n;
+    const vel = clamp(live.velocity / 2500, -1, 1);
+
+    // Where the handi sits in the reveal photo, so the sealed handi glides into exactly that spot and size.
+    const [hx, hy] = heartOnScreen(REVEAL, aspect);
+    const r = aspect / IMG_ASPECT;
+    const kx = (r < 1 ? r : 1) * 0.9 * 0.94;
+    const toScale = ((REVEAL_POT_W / kx) * 2 * view.hw) / (0.9 * POT_H);
+    const glide = reveal * reveal * (3 - 2 * reveal);
+    const baseY = -0.38 * scale;
+    pots.current.position.set(lerp(0, (hx - 0.5) * 2 * view.hw, glide), lerp(baseY - (1 - potIn) * 0.4, (hy - 0.5) * 2 * view.hh, glide), 0);
+    const potScale = lerp(scale * POT_BIG * lerp(0.88, 1, potIn), toScale, glide);
+    pots.current.scale.setScalar(potScale);
+    potMat.uniforms.uAlpha.value = on * potIn * (1 - seal);
+    sealedMat.uniforms.uAlpha.value = on * seal;
+    potMat.uniforms.uGlow.value = filled * 0.9;
+    sealedMat.uniforms.uGlow.value = 0.5 + reveal * 0.6;
+    potMat.uniforms.uTime.value = sealedMat.uniforms.uTime.value = fillMat.uniforms.uTime.value = time;
+    // The biriyani rises in the handi layer by layer, then brims over the rim.
+    fillMat.uniforms.uAlpha.value = potMat.uniforms.uAlpha.value * lerp(0.35, 1, fade);
+    fillMat.uniforms.uLevel.value = filled;
+    fillMat.uniforms.uMeat.value = 1 - span(p, PH.snap(2));
+    fillMat.uniforms.uGlow.value = filled * 0.6;
+
+    // The mouth of the open handi (world units), and how full it is.
+    const mx = pots.current.position.x;
+    const my = pots.current.position.y + MOUTH * POT_H * potScale;
+    const rx = MOUTH_RX * POT_H * potScale;
+    const ry = MOUTH_RY * POT_H * potScale;
+    const sizeK = Math.max(scale, 0.75) * 1.5;
+
+    // Exploded bands: edge to edge across the frame and deep, so the layers fill the screen around the handi.
+    const bandW = view.hw * 1.02;
+    const bandH = view.hh * 0.88;
+    const throwOut = 1 + Math.abs(vel) * 0.18; // fast scrolling flings the field wider
+    PIECES.forEach((it, i) => {
+      const [r0, r1, r2, r3, r4, r5, r6] = it.r;
+      const L = LAYERS[it.layer];
+      // Exploded: spread across the layer's band, evenly by index so the band reads as a layer, with depth.
+      const u = (it.k + 0.5) / it.n;
+      const side = u < 0.5 ? -1 : 1;
+      const bz = lerp(-1.6, 1.8, r2);
+      const persp = (CAM_Z - bz) / CAM_Z;
+      let ex = (u * 2 - 1) * bandW * (0.5 + 0.5 * r3) * persp * throwOut;
+      let ey = L.band * bandH + (r4 - 0.5) * 0.3 * bandH * persp;
+      const hold = span(p, [PH.explode[1], PH.snap(it.layer)[0]]); // time spent exploded, for the per-layer drift
+      // Scroll-driven parallax while held: near pieces slide out toward the margins, far ones drift in.
+      ex += side * hold * (bz > 0 ? 0.45 : -0.3) * persp;
+      if (L.drift === "up") ey += hold * 0.14;
+      if (L.drift === "side") ex += Math.sin(time * 0.5 + r5 * 6) * 0.12;
+      if (L.drift === "settle") ey -= hold * 0.08;
+      const bob = Math.sin(time * 0.8 + r6 * 6) * 0.03;
+      // Start: beyond the left or right margin at the piece's own height; each erupts a beat after its neighbours.
+      const sx = side * view.hw * lerp(1.25, 1.9, r0) * persp;
+      const sy = ey + (r1 - 0.5) * view.hh * 0.9;
+      const e = smoothstep01((explode - r6 * 0.3 - (3 - it.layer) * 0.04) / 0.58);
+      let x = lerp(sx, ex, e);
+      let y = lerp(sy, ey + bob, e) + Math.sin(e * Math.PI) * 0.35 * (r5 - 0.5);
+      let z = lerp(bz + 0.6, L.drift === "depth" ? bz * 1.2 : bz, e);
+      // Snap progress; pieces peel off a beat apart so each layer pours in as a stream, not all at once.
+      const [s0, s1] = PH.snap(it.layer);
+      const c = clamp((p - s0 - r5 * 0.025) / (s1 - s0 - 0.025), 0, 1);
+      const m = smoothstep01(c);
+      // Each layer lands on the surface it creates (meat deep in the pot, garnish heaped above the rim).
+      const [deep, rs] = surface((4 - it.layer) / 4);
+      const ra = Math.sqrt(r0) * 0.92 * rs;
+      const ang = r1 * 6.283;
+      const mound = it.layer === 0 ? 0.11 * (1 - ra * ra) * POT_H * potScale * Math.max(0, Math.sin(ang)) + 0.05 * potScale : 0;
+      const tx = mx + Math.cos(ang) * rx * ra;
+      // Never below the front lip: the copper wall hides anything lower.
+      const ty = Math.max(my - deep * POT_H * potScale + Math.sin(ang) * ry * ra, my - ry * 0.7) + mound;
+      const tz = 0.06 + (3 - it.layer) * 0.02 + r2 * 0.01;
+      // Buried under the next layer up (a few chicken pieces still show through, like a real opened pot).
+      const bury = it.layer > 0 ? span(p, PH.snap(it.layer - 1)) * (it.layer === 3 && r6 > 0.7 ? 0.3 : it.layer === 1 ? 0.5 : 0.9) : 0;
+      let swirl = 0;
+      if (c > 0) {
+        // The vortex: in polar coordinates round the mouth (on a ring tilted like the rim), each piece sweeps left to
+        // right across the front and behind the handi at the back, its radius tightening until it lands on its spot.
+        const u0 = x - mx;
+        const v0 = (y - my) / VORTEX_TILT;
+        const u1 = tx - mx;
+        const v1 = (ty - my) / VORTEX_TILT;
+        const a0 = Math.atan2(v0, u0);
+        swirl = ((((Math.atan2(v1, u1) - a0) % TAU) + TAU) % TAU) + TAU * lerp(0.6, 1.1, r3);
+        const a = a0 + swirl * m;
+        const r = lerp(Math.hypot(u0, v0), Math.hypot(u1, v1), m);
+        x = mx + Math.cos(a) * r;
+        y = my + Math.sin(a) * r * VORTEX_TILT;
+        // Round the back of the ring it passes behind the handi (z < 0 is hidden by the pot), round the front ahead of it.
+        z = lerp(z, tz, m) - Math.sin(a) * r * 0.6 * Math.sin(Math.PI * c);
+      }
+      buf.pos.set([x, y, z], i * 3);
+      const sf = it.layer === 3 ? fade : 1; // the meat layer dissolves through a flavour change
+      buf.size[i] = it.size * sizeK * lerp(0.8, 1, e) * lerp(1, 0.72, m) * lerp(0.75, 1, sf);
+      buf.angle[i] = r5 * 6.28 + (1 - e) * (r3 - 0.5) * 5 + time * (r0 - 0.5) * 0.3 * (1 - c) + swirl * m * 0.5;
+      // Landing: most pieces melt into the real food surface rising in the pot (useFill), so the mouth never clumps;
+      // a few stay on top as visible garnish and meat.
+      const keep = r6 > (it.layer === 0 ? 0.45 : 0.7) ? 1 : 1 - smoothstep01((c - 0.8) / 0.2);
+      // The nearest pieces thin out a little so the handi still reads through the field; gone before the lid appears.
+      buf.alpha[i] = on * smoothstep01((e - 0.02) / 0.1) * (z > 1.3 && m < 0.5 ? 0.8 : 1) * keep * sf * (1 - bury) * (1 - span(p, [0.655, 0.672]));
+    });
+    const at = points.current.geometry.attributes;
+    for (const key of ["position", "aSize", "aAlpha", "aAngle"]) at[key].needsUpdate = true;
+    itemMat.uniforms.uScale.value = (state.size.height * state.viewport.dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(state.camera.fov / 2)));
+
+    // Steam: rises from the mouth as the layers pack in, billows thick and wide round the seal, swells into the reveal.
+    live.cosmosMouth = my;
+    live.steam.set(0.5 + mx / (2 * view.hw), 0.5 + (my + 0.04) / (2 * view.hh), 0.07 + filled * 0.04 + seal * 0.08, Math.max(filled * 1.2 * (1 - seal), seal * 1.1 + reveal * 0.8));
+    live.burst = Math.max(live.burst, filled * 0.35 + seal * 0.35 + reveal * 0.3);
+  });
+
+  return (
+    <group ref={group} visible={false}>
+      <group ref={pots}>
+        <mesh material={potMat} renderOrder={1}>
+          <planeGeometry args={[POT_H, POT_H]} />
+        </mesh>
+        <mesh material={fillMat} renderOrder={1} position-z={0.005}>
+          <planeGeometry args={[POT_H, POT_H]} />
+        </mesh>
+        <mesh material={sealedMat} renderOrder={1} position-z={0.01}>
+          <planeGeometry args={[POT_H, POT_H]} />
+        </mesh>
+      </group>
+      <points ref={points} frustumCulled={false} material={itemMat} renderOrder={2}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[buf.pos, 3]} />
+          <bufferAttribute attach="attributes-aSize" args={[buf.size, 1]} />
+          <bufferAttribute attach="attributes-aAlpha" args={[buf.alpha, 1]} />
+          <bufferAttribute attach="attributes-aAngle" args={[buf.angle, 1]} />
+          <bufferAttribute attach="attributes-aCell" args={[buf.cell, 1]} />
+        </bufferGeometry>
+      </points>
+      <Particles count={low ? 120 : 260} texture={sprites.spark} update={updateOrbitDust} />
+    </group>
+  );
+}
+
+// A slow halo of golden dust round the handi while it fills.
+function updateOrbitDust(b, dt, t) {
+  const p = clamp(live.t - COSMOS, 0, 1);
+  const show = span(p, [0.38, 0.46]) * (1 - span(p, [0.62, 0.68]));
+  b.seeds.forEach((s, i) => {
+    const R = lerp(1, Math.min(view.hw * 0.9, 2.6), s.b);
+    const a = s.a * 6.28 + t * 0.12 * (s.b > 0.5 ? 1 : -1) + p * 4;
+    const z = Math.sin(a) * R;
+    set3(b.pos, i, Math.cos(a) * R, z * -0.18 + (live.cosmosMouth || 0), z * 0.8);
+    b.size[i] = 0.012 + s.d * 0.022;
+    b.alpha[i] = (live.cosmos || 0) * show * (0.25 + 0.75 * Math.sin(t * (2 + s.c * 3) + i) ** 2) * (0.4 + 0.6 * Math.max(0, Math.sin(a)));
+    set3(b.color, i, 1, 0.74 + s.c * 0.15, 0.4);
+  });
+}
+
+
+// Where plate p's focal point lands on screen (0–1), using the same cover fit as the plate pass.
+function heartOnScreen(p, aspect) {
+  const h = PLATES[p].heart || [0.5, 0.5];
+  const r = aspect / IMG_ASPECT;
+  const kx = (r < 1 ? r : 1) * 0.9 * 0.94;
+  const ky = (r < 1 ? 1 : 1 / r) * 0.9 * 0.94;
+  const cx = clamp(PLATES[p].focus, kx / 2 + 0.025, 1 - kx / 2 - 0.025);
+  return [(h[0] - cx) / kx + 0.5, (h[1] - 0.5) / ky + 0.5];
+}
+
+
 function Atmosphere({ low }) {
   const tex = useSprites();
   useFrame(({ camera, size }, delta) => {
@@ -844,6 +1256,7 @@ function Atmosphere({ low }) {
   });
   return (
     <>
+      <Cosmos low={low} />
       <Particles count={low ? 70 : 170} texture={tex.bokeh} update={updateDust} />
       <Particles count={low ? 6 : 10} texture={tex.strand} update={updateSaffron} blending={THREE.NormalBlending} />
       <Particles count={low ? 18 : 40} texture={tex.puff} update={updatePuffs} blending={THREE.NormalBlending} />

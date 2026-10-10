@@ -1,6 +1,7 @@
 "use client";
 
-import { DELIVERY_FEE, DELIVERY_PINS, HOURS, PHONE, PICKUP, WHATSAPP, inr } from "./cart";
+import { useEffect, useRef } from "react";
+import { DELIVERY_FEE, DELIVERY_PINS, DISHES, HOURS, OFFERS, PHONE, PICKUP, WHATSAPP, inr, useShop } from "./cart";
 
 // General knowledge about Malabar biriyani and its spices; nothing here is a claim about the business.
 const SPICES = [
@@ -15,6 +16,39 @@ const STEPS = [
   { n: "02", t: "Layer", d: "Kaima, the short-grain Malabar rice, goes over it with ghee, whole spices and fried shallots." },
   { n: "03", t: "Dum", d: "The lid is sealed, traditionally with dough, and the pot rests over low heat so it cooks in its own steam." },
 ];
+
+// A marquee band: the line repeats twice so the loop is seamless; it only runs while on screen, and holds still
+// under reduced motion. Content comes from the menu and the business's own offers.
+export function Ticker({ tone = "dark", reverse = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => ref.current?.style.setProperty("animation-play-state", e.isIntersecting ? "running" : "paused"));
+    io.observe(ref.current.parentElement);
+    return () => io.disconnect();
+  }, []);
+  const items =
+    tone === "dark"
+      ? [...OFFERS.map((o) => ["offer", o]), ...DISHES.map((d) => ["", d.full]), ["", "Delivery or pickup"], ["", "Order online"]]
+      : [...SPICES.map((s) => ["", `${s.local} · ${s.name}`]), ["", "Kaima rice"], ["", "Ghee"], ["", "Fried shallots"], ...OFFERS.map((o) => ["offer", o])];
+  const line = items.map(([k, t], i) => (
+    <span key={i} className="flex shrink-0 items-center gap-6 pr-6">
+      <span className={k ? "rounded-full bg-saffron px-3 py-0.5 text-ink" : ""}>{t}</span>
+      <span aria-hidden className={tone === "dark" ? "text-saffron" : "text-copper-deep"}>✦</span>
+    </span>
+  ));
+  return (
+    <div
+      aria-label={items.map(([, t]) => t).join(", ")}
+      role="marquee"
+      className={`relative z-10 overflow-hidden whitespace-nowrap py-3.5 font-serif text-xl sm:text-2xl ${tone === "dark" ? "bg-leaf-deep text-ivory" : "bg-saffron/90 text-ink"}`}
+    >
+      <div ref={ref} className={`marquee flex w-max ${reverse ? "marquee-rev" : ""}`} aria-hidden>
+        {line}
+        {line}
+      </div>
+    </div>
+  );
+}
 
 export function Craft() {
   return (
@@ -37,7 +71,7 @@ export function Craft() {
           {SPICES.map((s) => (
             <li key={s.n} className="lift text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`/plates/spice/${s.n}.webp`} alt="" width="160" height="160" loading="lazy" className="mx-auto h-24 w-24 object-contain drop-shadow-[0_12px_18px_rgba(0,0,0,0.45)]" />
+              <img data-speed={[0.6, -0.5, 0.9, -0.7, 0.4][SPICES.indexOf(s)]} src={`/plates/spice/${s.n}.webp`} alt="" width="160" height="160" loading="lazy" className="mx-auto h-24 w-24 object-contain drop-shadow-[0_12px_18px_rgba(0,0,0,0.45)]" />
               <p className="mt-3 font-serif text-xl">{s.name}</p>
               <p className="text-xs uppercase tracking-[0.25em] text-gold/90">{s.local}</p>
               <p className="mt-1 text-sm text-ivory/70">{s.note}</p>
@@ -110,12 +144,75 @@ export function Faq() {
   );
 }
 
+// "We've got the key to your happiness": a golden key whose ring frames a miniature of the selected biriyani, with
+// the line set on two arcs round the ring. All coordinates are constants (arcs precomputed), so SSR markup matches.
+function GoldenKey({ id }) {
+  return (
+    <svg viewBox="0 0 620 400" className="h-auto w-full max-w-xl overflow-visible" role="img" aria-label="A golden key whose ring frames a bowl of biriyani: we've got the key to your happiness">
+      <defs>
+        <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fbe7a1" />
+          <stop offset="0.3" stopColor="#e2b44b" />
+          <stop offset="0.55" stopColor="#a8741c" />
+          <stop offset="0.8" stopColor="#f0cf6e" />
+          <stop offset="1" stopColor="#9a6a17" />
+        </linearGradient>
+        <linearGradient id="gold-edge" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#7a520f" />
+          <stop offset="1" stopColor="#fff2bf" />
+        </linearGradient>
+        <clipPath id="key-window">
+          <circle cx="400" cy="170" r="96" />
+        </clipPath>
+        <filter id="key-shadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="10" dy="18" stdDeviation="12" floodColor="#000" floodOpacity="0.5" />
+        </filter>
+        <path id="arc-top" d="M235 123 A172 172 0 0 1 486 21" />
+        <path id="arc-bottom" d="M246 259 A178 178 0 0 0 576 145" />
+      </defs>
+      <g filter="url(#key-shadow)">
+        {/* Shaft, collar and bit, angled down to the left from the ring. */}
+        <g transform="rotate(-32 400 170)">
+          <rect x="70" y="156" width="214" height="28" rx="6" fill="url(#gold)" />
+          <rect x="256" y="144" width="34" height="52" rx="10" fill="url(#gold)" stroke="url(#gold-edge)" strokeWidth="2" />
+          <rect x="84" y="180" width="34" height="58" rx="3" fill="url(#gold)" />
+          <rect x="134" y="180" width="26" height="40" rx="3" fill="url(#gold)" />
+        </g>
+        {/* The ring and its window onto the biriyani. */}
+        <circle cx="400" cy="170" r="118" fill="none" stroke="url(#gold)" strokeWidth="44" />
+        <circle cx="400" cy="170" r="140" fill="none" stroke="url(#gold-edge)" strokeOpacity="0.6" strokeWidth="2" />
+        <circle cx="400" cy="170" r="96" fill="#2a1a0c" />
+        <image href={`/plates/dish/${id}.webp`} x="292" y="62" width="216" height="216" clipPath="url(#key-window)" preserveAspectRatio="xMidYMid slice" />
+        <circle cx="400" cy="170" r="96" fill="none" stroke="#000" strokeOpacity="0.35" strokeWidth="5" />
+      </g>
+      <text className="font-serif" fontSize="30" fill="#f5efe2" letterSpacing="1">
+        <textPath href="#arc-top" startOffset="50%" textAnchor="middle">We&rsquo;ve got the key to</textPath>
+      </text>
+      <text className="font-serif" fontSize="40" fontWeight="600" fill="#e6a23c" letterSpacing="1">
+        <textPath href="#arc-bottom" startOffset="50%" textAnchor="middle">your happiness</textPath>
+      </text>
+    </svg>
+  );
+}
+
 export function Footer() {
+  const { flavor } = useShop();
   const contact = [PHONE && ["Phone", PHONE, `tel:${PHONE.replace(/\s/g, "")}`], WHATSAPP && ["WhatsApp", `+${WHATSAPP}`, `https://wa.me/${WHATSAPP}`], PICKUP && ["Address", PICKUP], HOURS && ["Hours", HOURS]].filter(Boolean);
   return (
     <footer className="relative z-10 bg-leaf-deep px-5 pt-16 text-ivory sm:px-10 xl:px-16">
       <div className="trim mb-12" aria-hidden />
-      <div className="mx-auto grid max-w-7xl gap-10 pb-12 md:grid-cols-3">
+      <div className="mx-auto grid max-w-7xl items-center gap-8 pb-14 md:grid-cols-[1.2fr_1fr]">
+        <GoldenKey id={flavor} />
+        <div>
+          <p className="font-serif text-4xl leading-tight sm:text-5xl">
+            Royal Dum Heritage. <em className="text-saffron">From our chembu to your doorstep.</em>
+          </p>
+          <a href="#menu" className="mt-6 inline-flex min-h-12 items-center rounded-full bg-saffron px-7 text-sm font-semibold text-ink transition hover:bg-gold-soft">
+            Order Biriyani
+          </a>
+        </div>
+      </div>
+      <div className="mx-auto grid max-w-7xl gap-10 border-t border-ivory/10 pb-12 pt-12 md:grid-cols-3">
         <div>
           <p className="font-serif text-2xl tracking-[0.2em]">ROYAL DUM HERITAGE</p>
           <p className="mt-2 text-ivory/65">Malabar dum biriyani. From our chembu to your doorstep.</p>
