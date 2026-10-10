@@ -6,10 +6,10 @@ const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata = {
   title: "Royal Dum Heritage — Malabar Dum Biriyani",
-  description: "From the butcher's block to a sealed copper handi to your door: the story of a Malabar dum biriyani.",
+  description: "Malabar dum biriyani from Royal Dum Heritage. From our chembu to your doorstep: order for delivery or pickup.",
 };
 
-export const viewport = { themeColor: "#0A0A0A" };
+export const viewport = { themeColor: "#10231a", viewportFit: "cover" }; // cover: safe-area insets for the mobile bar
 
 export default function RootLayout({ children }) {
   return (

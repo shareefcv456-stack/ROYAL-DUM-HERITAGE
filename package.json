@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check": "node --no-warnings components/cart.check.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.8.1",
