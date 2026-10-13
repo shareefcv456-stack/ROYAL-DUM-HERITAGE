@@ -1,53 +1,44 @@
 "use client";
-// The shop's shared state: the selected flavour (also read by the WebGL assembly, via story.flavor), the cart and the
+// The shop's shared state: the selected flavour, the cart and the
 // checkout. A tiny external store so the header, the shop, the cart drawer and the assembly stay in sync without a provider.
 import { useSyncExternalStore } from "react";
-import { story } from "./state.js";
 
 // SAMPLE MENU. Every name, portion and price below is a placeholder, not business information: the shop shows a
 // "demo" notice while this is true. Replace the items with the real menu, then set SAMPLE to false.
 export const SAMPLE = true;
 
-// title/theme/floats are presentation only (the Flavour Wheel): display name, background and highlight colours,
-// and the floating ingredient sprites (public/plates/float/ or /spice/, art-src/float-sprites.py).
-export const DISHES = [
-  {
-    id: "chicken", title: "Authentic Chicken", theme: { bg: "#3a2611", hi: "#efb04a" }, floats: ["chicken-1", "chicken-2", "cashew", "cardamom"], accent: "#d39a32", name: "Chicken", full: "Chicken Dum Biriyani", price: 349,
-    note: "Bone-in chicken in a yoghurt, green chilli and ginger masala, layered under Kaima rice.",
-    layers: ["Chicken, masala", "Kaima rice, ghee & saffron", "Cardamom, clove, cinnamon, star anise", "Fried shallots, cashews, raisins"],
-    heat: 2, serves: "Serves 1–2", weight: "650 g", meat: "Marinated chicken", available: true,
-  },
-  {
-    id: "mutton", title: "Rich Mutton", theme: { bg: "#311619", hi: "#e39a74" }, floats: ["mutton-2", "mutton-1", "mutton-3", "cinnamon"], accent: "#a0603e", name: "Mutton", full: "Mutton Dum Biriyani", price: 449,
-    note: "Bone-in mutton in a peppery masala, slow-cooked under the rice.",
-    layers: ["Bone-in mutton, pepper masala", "Kaima rice, ghee & saffron", "Cinnamon, clove, black cardamom", "Fried shallots, mint, cashews"],
-    heat: 3, serves: "Serves 1–2", weight: "650 g", meat: "Bone-in mutton", available: true,
-  },
-  {
-    id: "beef", title: "Malabar Beef", theme: { bg: "#2b1410", hi: "#ea7a55" }, floats: ["beef-2", "beef-1", "beef-3", "clove"], accent: "#9a4433", name: "Beef", full: "Beef Dum Biriyani", price: 399,
-    note: "Beef braised with green chilli, ginger and curry leaf.",
-    layers: ["Beef, green chilli & ginger masala", "Kaima rice, ghee", "Fennel, clove, cardamom, curry leaf", "Fried shallots, green chilli"],
-    heat: 3, serves: "Serves 1–2", weight: "650 g", meat: "Beef", available: true,
-  },
-  {
-    id: "fish", title: "Spiced Fish", theme: { bg: "#0f2b2a", hi: "#f2914f" }, floats: ["fish-1", "fish-2", "onion", "star-anise"], accent: "#c8662f", name: "Fish", full: "Fish (Neymeen) Dum Biriyani", price: 529,
-    note: "Seer fish in red chilli and kokum, pan-seared, then laid on the rice.",
-    layers: ["Seer fish, red chilli & kokum", "Kaima rice, ghee & saffron", "Fennel, pepper, curry leaf", "Fried shallots, lime"],
-    heat: 3, serves: "Serves 1–2", weight: "600 g", meat: "Seer fish", available: true,
-  },
-  {
-    id: "prawn", title: "Prawn (Chemmeen)", theme: { bg: "#2e1714", hi: "#ff9470" }, floats: ["prawn-1", "prawn-2", "onion", "saffron"], accent: "#d07a52", name: "Prawn", full: "Prawn (Chemmeen) Dum Biriyani", price: 499,
-    note: "Prawns in coconut, curry leaf and black pepper.",
-    layers: ["Prawns, coconut & pepper masala", "Kaima rice, ghee & saffron", "Curry leaf, clove, cardamom", "Fried shallots, coconut slivers"],
-    heat: 2, serves: "Serves 1–2", weight: "600 g", meat: "Tiger prawns", available: true,
-  },
-];
+import { DISHES } from "./dishes.js";
+
+export { DISHES };
+export { slugOf, bySlug } from "./dishes.js";
 export const ADDONS = [
   { id: "raita", full: "Raita", note: "Curd with onion and cucumber.", price: 40, weight: "150 ml", available: true },
   { id: "pickle", full: "Pickle", note: "A small pot of pickle.", price: 30, weight: "50 g", available: true },
   { id: "payasam", full: "Payasam", note: "Sweet payasam to finish.", price: 90, weight: "200 ml", available: true },
 ];
 const ITEMS = [...DISHES, ...ADDONS];
+
+// The restaurant's own descriptors, as supplied by the business (2026-10-10). Shown as feature callouts.
+export const FEATURES = [
+  { icon: "rice", text: "100% Malabar Kaima Rice" },
+  { icon: "masala", text: "Handmade Dum Masala" },
+  { icon: "fire", text: "Wood-fired Slow Cooked" },
+];
+
+// Combos: fixed sets of menu items. Priced at the plain sum of their items unless the business sets `price`
+// (a real combo or festival discount); never invent one. These three are samples, like the menu (SAMPLE).
+export const COMBOS = [
+  { id: "family", name: "Family Dum Pack", tag: "Combo", items: { chicken: 2, mutton: 1, raita: 2 }, note: "Three handis and raita for the table." },
+  { id: "coast", name: "Coastal Pair", tag: "Combo", items: { fish: 1, prawn: 1, pickle: 1 }, note: "Both seafood biriyanis, with pickle." },
+  { id: "festival", name: "Festival Spread", tag: "Festival", items: { chicken: 1, mutton: 1, beef: 1, raita: 3, payasam: 3 }, note: "One of each meat, with raita and payasam to finish." },
+];
+export const comboPrice = (c) => c.price ?? Object.entries(c.items).reduce((a, [id, n]) => a + item(id).price * n, 0);
+// The whole pack in one store write, confirmed by its own name.
+export const addCombo = (c) => {
+  const cart = { ...state.cart };
+  for (const [id, n] of Object.entries(c.items)) cart[id] = Math.min(MAX_QTY, (cart[id] || 0) + n);
+  set({ cart, bump: state.bump + 1, last: c.name });
+};
 export const dish = (id) => DISHES.find((d) => d.id === id);
 export const item = (id) => ITEMS.find((d) => d.id === id);
 export const inr = (n) => `₹${n.toLocaleString("en-IN")}`;
@@ -58,6 +49,9 @@ export const WHATSAPP = "";
 export const PHONE = ""; // shown in the footer, e.g. "+91 98765 43210"
 export const PICKUP = ""; // pickup address as it should be shown
 export const HOURS = ""; // e.g. "Daily, 12 pm – 10 pm"
+// Kitchen hours in 24h local time, e.g. { open: "12:00", close: "22:30" }; powers the live "Open now" status.
+// null → no live status is claimed (the header shows "Delivery & pickup" instead).
+export const KITCHEN_HOURS = null;
 // Delivery areas as 6-digit PIN codes. Empty → any valid PIN is accepted and the area is confirmed with the order.
 export const DELIVERY_PINS = [];
 export const DELIVERY_FEE = null; // a number in rupees, or null → "confirmed with your order"
@@ -72,7 +66,6 @@ let state = { flavor: "chicken", cart: {}, open: false, step: "cart", fulfil: "d
 const subs = new Set();
 const set = (patch) => {
   state = { ...state, ...patch };
-  story.flavor = state.flavor;
   try {
     localStorage.setItem("rdh-cart", JSON.stringify(state.cart));
   } catch {}
@@ -106,9 +99,10 @@ export const setQty = (id, n) => {
   set({ cart });
 };
 // Adding bumps a counter the cart button animates on, so every add gets visible feedback.
+// One store write per add (cart, count and confirmation together), so every view updates in the same frame.
 export const add = (id, n = 1) => {
-  setQty(id, (state.cart[id] || 0) + n);
-  set({ bump: state.bump + 1 });
+  const q = Math.min(MAX_QTY, (state.cart[id] || 0) + n);
+  set({ cart: { ...state.cart, [id]: q }, bump: state.bump + 1, last: item(id)?.full });
 };
 
 export const lines = (cart) => ITEMS.filter((d) => cart[d.id]).map((d) => ({ ...d, qty: cart[d.id] }));

@@ -1,6 +1,6 @@
 // Run: npm run check. Totals and the order message, the parts of the shop that handle money.
 import assert from "node:assert/strict";
-import { DISHES, ADDONS, inr, orderMessage, pinStatus, totals } from "./cart.js";
+import { ADDONS, COMBOS, DISHES, comboPrice, inr, orderMessage, pinStatus, totals } from "./cart.js";
 
 const chicken = DISHES.find((d) => d.id === "chicken");
 const raita = ADDONS.find((d) => d.id === "raita");
@@ -17,4 +17,8 @@ assert.equal(pinStatus("67300"), "bad");
 assert.equal(pinStatus("abc123"), "bad");
 assert.equal(pinStatus(" 673001 "), "ok", "no areas listed → any valid PIN");
 assert.doesNotMatch(orderMessage({ ref: "R", ...t, fulfil: "pickup", details: { name: "A", phone: "1" } }), /Delivery to/);
+// A combo without a set price costs exactly the sum of its items (no invented discount).
+const family = COMBOS.find((c) => c.id === "family");
+assert.equal(comboPrice(family), totals(family.items).total);
+assert.equal(comboPrice({ ...family, price: 999 }), 999);
 console.log("cart ok");

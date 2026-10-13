@@ -8,9 +8,10 @@ P = root + "/public/plates/"
 DISC = {"mutton": (434, 505, 200), "beef": (452, 490, 170), "fish": (428, 488, 205), "prawn": (420, 505, 185)}
 
 def disc(f, k=1):
-    x, y, r = DISC[f]
-    r = int(r * k)
-    im = Image.open(f"{P}shop/{f}.jpg").convert("RGB").crop((x - r, y - r, x + r, y + r))
+    x, y, r = DISC[f]  # in 814-wide shop-photo pixels; scaled to the photo actually on disk
+    sc = Image.open(f"{P}shop/{f}.jpg").width / 814
+    x, y, r = x * sc, y * sc, int(r * k * sc)
+    im = Image.open(f"{P}shop/{f}.jpg").convert("RGB").crop((round(x - r), round(y - r), round(x + r), round(y + r)))
     # daylight studio → the plates' warm, low firelight
     im = ImageEnhance.Contrast(ImageEnhance.Brightness(im).enhance(0.8)).enhance(1.12)
     return Image.merge("RGB", [c.point(lambda v, k=k: min(255, int(v * k))) for c, k in zip(im.split(), (1.04, 0.97, 0.86))])

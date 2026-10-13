@@ -1,19 +1,34 @@
 @import "tailwindcss";
 
-/* Modern Malabar Kitchen: banana-leaf green, warm ivory, aged copper, restrained saffron. */
+/* Brand palette (the user's burnt-orange brief): warm ivory and light peach for the lighter, storytelling sections;
+   signature orange for highlights, active cards and selected controls; burnt orange and deep terracotta for the menu's
+   richer ground and accents; dark cocoa for text, muted brown for secondary text. Named tokens first; the older names
+   used across the components map onto them, so every section shares one system. Buttons that carry white text use
+   burnt orange (crimson), since white on signature orange is too faint to read comfortably. */
 @theme {
-  --color-leaf: #1d3a2a;
-  --color-leaf-deep: #10231a;
-  --color-leaf-soft: #2c5440;
-  --color-charcoal: #0b0d0b;
-  --color-gold: #d9b45a;
-  --color-gold-soft: #e9d29a;
-  --color-copper: #b87333;
-  --color-copper-deep: #8a5a22;
-  --color-saffron: #e6a23c;
-  --color-ivory: #f5efe2;
-  --color-paper: #faf6ee;
-  --color-ink: #1c1814;
+  --color-ivory: #fff7ef;
+  --color-peach: #fbe2d2;
+  --color-apricot: #f7b184;
+  --color-orange: #ed6a35;
+  --color-burnt: #c94b24;
+  --color-terracotta: #8f321d;
+  --color-cocoa: #38251e;
+  --color-muted: #79665c;
+  --color-paper: #fff7ef;
+  --color-ink: #38251e;
+  --color-saffron: #f7b184;
+  --color-amber: #f7b184;
+  --color-copper: #ed6a35;
+  --color-copper-deep: #c94b24;
+  --color-crimson: #c94b24;
+  --color-crimson-deep: #8f321d;
+  --color-heritage: #285a42; /* selected states, availability */
+  --color-leaf: #1e1914;
+  --color-leaf-deep: #12100e;
+  --color-leaf-soft: #2e261f;
+  --color-charcoal: #2a1a14;
+  --color-gold: #c8553a;
+  --color-gold-soft: #f3c3a8;
   --font-serif: var(--font-serif), Georgia, serif;
   --font-sans: var(--font-sans), system-ui, sans-serif;
 }
@@ -28,10 +43,25 @@ html {
 body {
   font-family: var(--font-sans);
   overflow-x: clip;
+  font-variant-numeric: lining-nums; /* Inter's figures line up with the serif headings and prices */
 }
 
+/* Editorial type: headings break into balanced lines, paragraphs avoid orphans; the serif uses its real italics. */
+/* In the base layer, so utility classes (whitespace-nowrap, text-balance…) can override them. */
+@layer base {
+  h1, h2, h3 { text-wrap: balance; }
+  p, li { text-wrap: pretty; }
+}
+h1, h2, h3, em { font-kerning: normal; }
+
+/* Accordions open and close smoothly where the browser can animate to "auto" (details::details-content). */
+:root { interpolate-size: allow-keywords; }
+.faq details::details-content { block-size: 0; overflow: hidden; transition: block-size 0.35s cubic-bezier(.2, .8, .2, 1), content-visibility 0.35s allow-discrete; }
+.faq details[open]::details-content { block-size: auto; }
+.faq details[open] .faq-answer { animation: settle 0.45s 0.05s cubic-bezier(.2, .8, .2, 1) both; }
+
 :focus-visible {
-  outline: 2px solid var(--color-saffron);
+  outline: 2px solid var(--color-crimson);
   outline-offset: 3px;
 }
 
@@ -40,47 +70,54 @@ body {
   color: var(--color-ink);
 }
 
-/* Banana leaf: fine parallel veins over deep green. */
-.leaf {
-  background-color: var(--color-leaf);
-  background-image:
-    repeating-linear-gradient(104deg, rgb(255 255 255 / 0.028) 0 1px, transparent 1px 26px),
-    radial-gradient(120% 80% at 80% 0%, rgb(255 255 255 / 0.05), transparent 60%);
-}
-
-/* The same veins on any background colour (the Flavour Wheel sets its own). */
-.veins { background-image: repeating-linear-gradient(104deg, rgb(255 255 255 / 0.03) 0 1px, transparent 1px 26px); }
-
-/* Sharp editorial cut-in: each line rises out of its own mask; the rest follows a beat later. */
+/* Editorial cut-in: a line rises out of its own mask (.intro-cut); text settles up into place (.intro-line, FAQ). */
 @keyframes cut { from { transform: translateY(105%); } }
-.cut-in h2 > span > * { animation: cut 0.75s cubic-bezier(.2, .8, .2, 1) both; }
-.cut-in h2 > span:nth-child(2) > * { animation-delay: 0.08s; }
-.cut-in > :not(h2) { animation: settle 0.6s 0.18s cubic-bezier(.2, .8, .2, 1) both; }
 
 /* Magnetic cards: they lean toward the cursor (--mx/--my set from pointer position) and lift on hover or focus. */
 .magnetic { transform: translate3d(var(--mx, 0px), calc(var(--my, 0px) + var(--lift, 0px)), 0); transition: transform 0.4s cubic-bezier(.2, .8, .2, 1), box-shadow 0.3s; }
-.magnetic:hover, .magnetic:focus-within { --lift: -5px; box-shadow: 0 26px 44px -26px rgb(28 24 20 / 0.4); }
+.magnetic:hover, .magnetic:focus-within { --lift: -5px; }
+.magnetic:not(.on-dark):hover, .magnetic:not(.on-dark):focus-within { box-shadow: 0 26px 44px -26px rgb(28 24 20 / 0.4); }
 
-/* Kerala woodwork: a thin carved lattice band in aged copper, used sparingly as a divider. */
-.trim {
-  height: 10px;
-  background:
-    linear-gradient(var(--color-copper), var(--color-copper)) top / 100% 1px no-repeat,
-    linear-gradient(var(--color-copper), var(--color-copper)) bottom / 100% 1px no-repeat,
-    repeating-linear-gradient(45deg, transparent 0 4px, rgb(184 115 51 / 0.55) 4px 5px, transparent 5px 9px),
-    repeating-linear-gradient(-45deg, transparent 0 4px, rgb(184 115 51 / 0.55) 4px 5px, transparent 5px 9px);
-  opacity: 0.7;
-}
-
-/* The hero dish's text settles in whenever the dish changes (the block is re-keyed). */
 @keyframes settle { from { opacity: 0; transform: translateY(10px); } }
-.settle > * { animation: settle 0.55s cubic-bezier(.2, .8, .2, 1) both; }
-.settle > :nth-child(2) { animation-delay: 0.05s; }
-.settle > :nth-child(n + 3) { animation-delay: 0.1s; }
 
-/* Spices drifting at the outer edges of the hero, each at its own pace. */
-@keyframes drift { 50% { transform: translate3d(0, -14px, 0) rotate(var(--spin, 8deg)); } }
-.drift { animation: drift var(--dur, 9s) ease-in-out infinite; }
+/* Opening (Intro.jsx): a static grain over each half (cream paper, matte charcoal), the photo easing in out of the dark,
+   the dish name wiping in on every change, and steam: soft blurred wisps that rise, sway, widen and thin out on
+   staggered loops. Steam animates transform and opacity only, so it stays on the compositor. */
+.grain::before, .grain-dark::before { content: ""; position: absolute; inset: 0; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.grain::before { opacity: 0.35; mix-blend-mode: multiply; }
+.grain-dark::before { z-index: 1; opacity: 0.25; mix-blend-mode: overlay; }
+.smoke { position: absolute; bottom: 0; width: 34%; aspect-ratio: 1 / 1.7; margin-left: -17%; border-radius: 50%; background: radial-gradient(closest-side, rgb(255 246 236 / 0.5), rgb(255 238 220 / 0.14) 60%, transparent); filter: blur(12px); mix-blend-mode: screen; opacity: 0; will-change: transform, opacity; transform-origin: 50% 100%; animation: smoke var(--t, 7s) linear var(--dl, 0s) infinite; }
+@keyframes smoke {
+  0% { opacity: 0; transform: translate(0, 20%) scale(0.4, 0.45); }
+  18% { opacity: 0.85; }
+  55% { transform: translate(var(--sx, -12%), -55%) scale(0.95, 1.1); }
+  100% { opacity: 0; transform: translate(calc(var(--sx, -12%) * -1), -125%) scale(1.6, 1.9); }
+}
+@media (prefers-reduced-motion: reduce) { .smoke { animation: none; } .smoke { opacity: 0.4; } }
+.intro-line { animation: settle 0.6s var(--d, 0s) cubic-bezier(.2, .8, .2, 1) both; }
+.intro-cut { animation: cut 0.7s var(--d, 0s) cubic-bezier(.2, .8, .2, 1) both; }
+
+/* Delivery & pickup illustrations (Info.jsx): the road scrolls, wheels turn, steam rises; all quicker on hover. */
+.ride-road { stroke-dasharray: 10 8; animation: road 1.4s linear infinite; }
+@keyframes road { to { stroke-dashoffset: -18; } }
+.ride-wheel { transform-box: fill-box; transform-origin: center; animation: spin 1.6s linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
+.ride-body { animation: bob 0.9s ease-in-out infinite alternate; }
+@keyframes bob { to { translate: 0 -1.5px; } }
+.ride-speed { animation: whoosh 1.4s ease-in-out infinite; }
+@keyframes whoosh { 0%, 100% { opacity: 0.2; translate: 4px 0; } 50% { opacity: 1; translate: -4px 0; } }
+.ride-steam path, .handi-steam path { animation: steam-up 2.6s ease-in-out infinite; }
+.ride-steam path:nth-child(2), .handi-steam path:nth-child(2) { animation-delay: 0.6s; }
+.handi-steam path:nth-child(3) { animation-delay: 1.2s; }
+@keyframes steam-up { 0% { opacity: 0; translate: 0 6px; } 40% { opacity: 1; } 100% { opacity: 0; translate: 0 -8px; } }
+.handi-bag { transform-box: fill-box; transform-origin: 50% 100%; animation: sway 3.2s ease-in-out infinite alternate; }
+@keyframes sway { from { rotate: -1.5deg; } to { rotate: 1.5deg; } }
+.group:hover .ride-road { animation-duration: 0.6s; }
+.group:hover .ride-wheel { animation-duration: 0.6s; }
+.group:hover .handi-steam path { animation-duration: 1.6s; }
+/* Magnetic buttons lean toward the cursor (--mx/--my from Shop.jsx magnet) and press down when tapped. */
+.magnetic-btn { transform: translate3d(calc(var(--mx, 0px) * 0.6), calc(var(--my, 0px) * 0.6), 0); transition: transform 0.35s cubic-bezier(.2, .8, .2, 1), background-color 0.3s, box-shadow 0.3s; }
+.magnetic-btn:active { transform: translate3d(0, 1px, 0) scale(0.98); }
 
 /* Ticker bands: one copy of the line slides out as its twin slides in. Compositor-only. */
 @keyframes marquee { to { transform: translate3d(-50%, 0, 0); } }
@@ -88,28 +125,167 @@ body {
 .marquee-rev { animation-direction: reverse; }
 @media (prefers-reduced-motion: reduce) { .marquee { animation: none; } }
 
-/* Biriyani O'Clock: the clock shakes in short bursts while waves pulse beside it; faster when clicked. */
-.alarm-body, .alarm-waves { transform-box: view-box; transform-origin: 200px 250px; }
-@keyframes alarm-shake {
-  0%, 18%, 100% { transform: rotate(0); }
-  2%, 6%, 10%, 14% { transform: rotate(-4deg); }
-  4%, 8%, 12%, 16% { transform: rotate(4deg); }
-}
-@keyframes alarm-waves { 0%, 22%, 100% { opacity: 0; transform: scale(0.92); } 5%, 16% { opacity: 0.85; transform: scale(1.04); } }
-.alarm-body.alarm-idle { animation: alarm-shake 3.4s ease-in-out infinite; }
-.alarm-waves.alarm-idle { animation: alarm-waves 3.4s ease-out infinite; }
-.alarm-body.alarm-ring { animation: alarm-shake 0.8s ease-in-out 2; }
-.alarm-waves.alarm-ring { animation: alarm-waves 0.8s ease-out 2; }
+/* The cart counter taking the dish: a soft scale-bounce that settles (fly.js). */
+@keyframes catch { 0% { scale: 1; } 30% { scale: 1.26; } 55% { scale: 0.95; } 78% { scale: 1.05; } 100% { scale: 1; } }
+.catch { animation: catch 0.9s cubic-bezier(.2, .8, .2, 1); }
+.catch[data-mouth] { transform-origin: 50% 100%; } /* the bucket bounces from its base */
+/* Added confirmation: rises in, holds, fades out (Shop.jsx AddedNote, re-keyed on every add). */
+@keyframes note { 0% { opacity: 0; transform: translateY(12px); } 10%, 82% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-4px); } }
+.added-note { animation: note 2.6s cubic-bezier(.2, .8, .2, 1) both; }
 
-/* Cart button: a short pop on every add. */
-@keyframes pop { 40% { transform: scale(1.25); } }
-.pop { animation: pop 0.35s ease-out; }
-
-/* Static film grain: no animation, so it costs nothing per frame. */
-.grain {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Wavy lines over a colour block (the reference's coral half): a light tile, no animation. */
+.waves {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='28'%3E%3Cpath d='M0 14q15-9 30 0t30 0 30 0 30 0' fill='none' stroke='%23fff' stroke-opacity='.2' stroke-width='1.5'/%3E%3C/svg%3E");
 }
+/* Line-drawn spice doodles (leaf, chilli, onion, star anise) over the orange "pack to plate" ground (Pack.jsx). */
+.doodles {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' fill='none' stroke='%23fff' stroke-opacity='.26' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 58c0-22 20-34 40-32-2 18-16 34-40 32ZM18 58l28-22'/%3E%3Cpath d='M112 18c12 0 16 10 13 22-4 18-19 32-36 34 14-10 23-24 21-36-1-7 0-13 2-20ZM112 18c1-6 5-9 10-10'/%3E%3Ccircle cx='48' cy='132' r='16'/%3E%3Ccircle cx='48' cy='132' r='8'/%3E%3Cpath d='M136 108l4 11 11-3-8 9 8 9-11-3-4 11-4-11-11 3 8-9-8-9 11 3Z'/%3E%3Ccircle cx='92' cy='96' r='2'/%3E%3Ccircle cx='160' cy='70' r='2'/%3E%3Ccircle cx='96' cy='164' r='2'/%3E%3C/svg%3E");
+}
+/* Pack to plate (Pack.jsx): --f (0–1, from scroll) turns the pack in edge-on, faces it, then flips it to the plate. */
+.pack-card { transform-style: preserve-3d; transform: rotateY(calc(-90deg + var(--f, 1) * 270deg)); }
+.pack-face { position: absolute; inset: 0; backface-visibility: hidden; }
+.pack-back { transform: rotateY(180deg); }
+
+/* Promos.jsx. This or That: each new plate rolls in along its pill from the far end (--rx/--ry/--rr), then keeps
+   rocking to and fro on it (--dx/--dy/--dr); the dashed arrow keeps flowing. */
+@keyframes roll-in { from { opacity: 0; transform: translate(var(--rx), var(--ry)) rotate(var(--rr)); } }
+@keyframes roll-rock { from { transform: none; } to { transform: translate(var(--dx), var(--dy)) rotate(var(--dr)); } }
+.roll-in { animation: roll-in 0.9s cubic-bezier(.2, .8, .2, 1) both, roll-rock 1.9s 0.9s ease-in-out infinite alternate; }
+@keyframes dash-flow { to { stroke-dashoffset: -30; } }
+.dash-flow { animation: dash-flow 1.2s linear infinite; }
+/* Walking handis (Promos.jsx Walk): the parade slides right (two copies, so -50% → 0 loops seamlessly). A 0.9s gait:
+   each thigh swings from the hip and the shin folds at the knee as the foot lifts, the other leg half a cycle behind;
+   the pot bobs on every step and waddles once per stride, and its shadow shrinks as it rises. Held while off screen or
+   hovered; on the red man (.walk-stopped) the parade halts and everyone stands straight. */
+@keyframes walk-across { from { transform: translate3d(-50%, 0, 0); } to { transform: translate3d(0, 0, 0); } }
+.walk-track { animation: walk-across 13s linear infinite; }
+@keyframes thigh { 0%, 100% { rotate: -26deg; } 60% { rotate: 22deg; } }
+@keyframes shin { 0%, 52%, 100% { rotate: 0deg; } 72% { rotate: 50deg; } 88% { rotate: 12deg; } }
+.walk-leg { animation: thigh 0.9s ease-in-out infinite; }
+.walk-shin { animation: shin 0.9s ease-in-out infinite; }
+.walk-leg-b, .walk-leg-b .walk-shin { animation-delay: -0.45s; }
+@keyframes step-bob { 50% { translate: 0 -8px; } }
+.walk-body { animation: step-bob 0.45s ease-in-out infinite; }
+@keyframes waddle { 0%, 100% { rotate: -2deg; } 50% { rotate: 2deg; } }
+.walk-sway { transform-origin: 100px 170px; animation: waddle 0.9s ease-in-out infinite; }
+@keyframes shadow-step { 50% { scale: 0.84 1; opacity: 0.7; } }
+.walk-shadow { transform-origin: 100px 262px; animation: shadow-step 0.45s ease-in-out infinite; }
+.walk-track:hover, .walk-paused .walk-track, .walk-stopped .walk-track,
+.walk-track:hover :is(.walk-leg, .walk-shin, .walk-body, .walk-sway, .walk-shadow),
+.walk-paused :is(.walk-leg, .walk-shin, .walk-body, .walk-sway, .walk-shadow, .drift) { animation-play-state: paused; }
+.walk-stopped :is(.walk-leg, .walk-shin, .walk-body, .walk-sway, .walk-shadow) { animation: none; }
+@keyframes blink { 50% { opacity: 0.15; } }
+.blink { animation: blink 0.6s steps(1) infinite; }
+@keyframes drift { from { translate: -30vw 0; } to { translate: 110vw 0; } }
+.drift { animation: drift 48s linear infinite; }
+.drift-slow { animation-duration: 70s; animation-delay: -30s; }
+
+/* A faint, soft ring of RD seals over the delivery band (Info.jsx). */
+.rd-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cg fill='none' stroke='%23a8301a' stroke-opacity='.05' stroke-width='1.5'%3E%3Ccircle cx='38' cy='38' r='22'/%3E%3Ccircle cx='38' cy='38' r='17'/%3E%3Ccircle cx='113' cy='113' r='22'/%3E%3Ccircle cx='113' cy='113' r='17'/%3E%3C/g%3E%3Cg fill='%23a8301a' fill-opacity='.06' font-family='Georgia,serif' font-size='13' text-anchor='middle'%3E%3Ctext x='38' y='43'%3ERD%3C/text%3E%3Ctext x='113' y='118'%3ERD%3C/text%3E%3C/g%3E%3C/svg%3E");
+}
+/* Footer swipe-to-order: the dish nudges right while idle, to show the gesture. */
+@keyframes swipe-hint { 0%, 55%, 100% { translate: 0 0; } 25% { translate: 34px 0; } }
+.swipe-hint { animation: swipe-hint 2.6s cubic-bezier(.2, .8, .2, 1) infinite; }
+
+/* The flavour card pop-up (Flavours.jsx): springs up from the strip; the backdrop fades in. */
+@keyframes card-pop { from { opacity: 0; transform: translateY(24px) scale(0.86); } }
+@keyframes fade-in { from { opacity: 0; } }
+.card-pop[open] { animation: card-pop 0.45s cubic-bezier(.3, 1.3, .5, 1); }
+.card-pop[open]::backdrop { animation: fade-in 0.3s ease-out; }
+
+
+.nav-pop { inset: 0 0 auto auto; }
+.nav-pop:popover-open { animation: settle 0.25s cubic-bezier(.2, .8, .2, 1); }
+
+/* Delivery & pickup cards (Info.jsx): animated option icons, and the RD seal that drifts against the cursor and
+   ripples while the card is hovered. Springy transitions, so the parcel hops and the bag swells. */
+:is(.di-parcel, .di-scooter, .di-speed, .pk-bag) { transform-box: fill-box; transform-origin: center; transition: transform 0.6s cubic-bezier(.34, 1.56, .64, 1), opacity 0.4s, filter 0.5s; }
+.di-scooter { opacity: 0; transform: translateX(-10px); }
+.di-speed { opacity: 0; }
+.di-wheel { transform-box: fill-box; transform-origin: center; }
+.group:is(:hover, :focus-within) .di-parcel { transform: translate(-30%, -12%) scale(0.5); }
+.group:is(:hover, :focus-within) .di-scooter { opacity: 1; transform: none; }
+.group:is(:hover, :focus-within) .di-wheel { animation: spin 0.6s linear infinite; }
+.group:is(:hover, :focus-within) .di-speed { opacity: 1; animation: whoosh 0.8s ease-in-out infinite; }
+.pk-bag { transform-origin: 50% 100%; }
+.group:is(:hover, :focus-within) .pk-bag { transform: scale(1.14); filter: drop-shadow(0 0 6px rgb(247 164 111 / 0.9)); }
+@keyframes lid-pack { 0%, 100% { translate: 0 0; rotate: 0deg; } 40% { translate: 0 -5px; rotate: -8deg; } }
+.pk-lid { transform-box: fill-box; transform-origin: center; }
+.group:is(:hover, :focus-within) .pk-lid { animation: lid-pack 1.2s ease-in-out infinite; }
+.card-mark { z-index: -1; transform: translate3d(calc(var(--mx, 0px) * -2.5), calc(var(--my, 0px) * -2.5), 0); transition: transform 0.7s cubic-bezier(.2, .8, .2, 1); }
+@keyframes mark-ripple { from { transform: scale(0.8); opacity: 0.9; } to { transform: scale(1.35); opacity: 0; } }
+.mark-ripple { transform-box: fill-box; transform-origin: center; opacity: 0; }
+.group:hover .mark-ripple { animation: mark-ripple 2.4s ease-out infinite; }
+
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
+
+
+
+/* Shop photographs: mutton.jpg carries a thin dark frame from its source; a 3% scale crops it (and any other edge) out
+   wherever these photos appear. Hover zooms in card markup still go past this. */
+img[src^="/plates/shop/"] { scale: 1.03; }
+
+/* The finished biriyani's glisten (Assembly.jsx): a soft light band crossing the surface every few seconds. */
+@keyframes glint { 0%, 30% { transform: translateX(-160%) skewX(-12deg); } 100% { transform: translateX(320%) skewX(-12deg); } }
+.glint { animation: glint 4.5s cubic-bezier(.4, 0, .2, 1) infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .glint { animation: none; opacity: 0; } }
+
+/* Hero (Intro.jsx): each dish's details slide in as the dish changes. */
+@keyframes slide-in { from { opacity: 0; transform: translateX(calc(var(--dir, 1) * 56px)); } }
+.slide-in { animation: slide-in 0.9s 0.15s cubic-bezier(.2, .8, .2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .slide-in { animation: none; } }
+
+/* Delivery band (Info.jsx): whole spices drifting in slow loops; the two biriyanis behind turn with .spin-slow. */
+@keyframes spice-float { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 33% { transform: translate(14px, -22px) rotate(14deg); } 66% { transform: translate(-10px, -8px) rotate(-10deg); } }
+.spice-float { animation: spice-float 12s ease-in-out infinite; will-change: transform; filter: drop-shadow(0 10px 12px rgb(110 40 10 / 0.25)); }
+.spin-slow { animation: spin 140s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spice-float, .spin-slow { animation: none; } }
+
+
+/* Steam on a light ground (FinalOrder.jsx): a white core reads over the food, a faint warm-grey edge over the cream,
+   drawn normally instead of screened. Same rise as .smoke. */
+.smoke-light { background: radial-gradient(closest-side, rgb(255 255 255 / 0.8), rgb(255 252 248 / 0.45) 45%, rgb(150 125 110 / 0.14) 70%, transparent); mix-blend-mode: normal; filter: blur(10px); }
+
+/* Menu quantity pill (Shop.jsx Qty): grows in from the add button's place when a dish first goes in the cart. */
+@keyframes qty-in { from { opacity: 0; transform: scale(0.85); } }
+.qty-in { animation: qty-in 0.35s cubic-bezier(.3, 1.4, .5, 1); }
+
+/* Split hero (Intro.jsx): the photo eases in out of the dark; the steam fades back in once a new photo has settled; the
+   words' palette (registered colours, so a dish change blends ground, accent and ink together). */
+@keyframes photo-in { from { opacity: 0; transform: scale(1.06); } }
+.intro-photo { animation: photo-in 1.6s 0.2s cubic-bezier(.2, .8, .2, 1) both; }
+@property --hero-bg { syntax: "<color>"; inherits: true; initial-value: #fbe3b0; }
+@property --hero-accent { syntax: "<color>"; inherits: true; initial-value: #a8500f; }
+@property --hero-ink { syntax: "<color>"; inherits: true; initial-value: #47290c; }
+.hero-theme { transition: --hero-bg 1.1s cubic-bezier(.4, 0, .2, 1), --hero-accent 1.1s cubic-bezier(.4, 0, .2, 1), --hero-ink 1.1s cubic-bezier(.4, 0, .2, 1); }
+@media (prefers-reduced-motion: reduce) { .intro-photo { animation: none; } }
+/* Page transition (Shutter.jsx): the terracotta shutter rises from below with an ivory leaf just ahead of it, and carries
+   on upward to reveal the new page; between pages it rests below the screen, out of sight. */
+.shutter-main, .shutter-leaf { transform: translateY(-100%); }
+.shutter[data-phase="idle"] .shutter-main, .shutter[data-phase="idle"] .shutter-leaf { transform: translateY(100%); transition: none; }
+.shutter[data-phase="cover"] .shutter-main { transform: none; transition: transform 0.52s cubic-bezier(.7, 0, .2, 1) 0.06s; }
+.shutter[data-phase="cover"] .shutter-leaf { transform: none; transition: transform 0.5s cubic-bezier(.7, 0, .2, 1); }
+.shutter[data-phase="cover"] { pointer-events: auto; }
+.shutter[data-phase="reveal"] .shutter-main { transform: translateY(-100%); transition: transform 0.7s cubic-bezier(.7, 0, .2, 1); }
+.shutter[data-phase="reveal"] .shutter-leaf { transform: translateY(-100%); transition: transform 0.7s cubic-bezier(.7, 0, .2, 1) 0.08s; }
+@keyframes shutter-steam { 0% { opacity: 0; transform: translateY(4px); } 50% { opacity: 1; } 100% { opacity: 0; transform: translateY(-6px); } }
+.shutter-steam { animation: shutter-steam 1.6s ease-in-out infinite; }
+
+/* Opening loader (Loader.jsx). The hero's entrance waits while `html.is-loading` is set. Only the number, the ring and
+   the steam move; at the end the loader fades away. Failsafe: the overlay hides itself after 9 s even if no script runs. */
+html.is-loading #top, html.is-loading #top * { animation-play-state: paused !important; }
+.loader { animation: loader-failsafe 0.4s 9s forwards; transition: opacity 0.55s ease; }
+@keyframes loader-failsafe { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+.loader[data-phase="out"] { opacity: 0; pointer-events: none; }
+/* The loader's waves sway slowly. */
+@keyframes loader-wave { 50% { transform: translateX(-2.5%) scaleY(1.04); } }
+.loader-wave { transform-origin: 50% 100%; animation: loader-wave 9s ease-in-out infinite; }
+.loader-wave-2 { animation-duration: 12s; animation-direction: reverse; }
+@media (prefers-reduced-motion: reduce) { .loader-wave { animation: none; } }
+
+
+
